@@ -1,6 +1,11 @@
 function solution(arr) {
   let answer = '';
-  const sum = arr.reduce((a, b) => a + b);
+  const sum = arr.reduce((a, b) => {
+    // console.log(a);
+    // console.log(b);
+    return a + b
+
+  });
 
   for (let i = 0; i < arr.length - 1; i++) {
     for (let j = i + 1; j < arr.length; j++) {
