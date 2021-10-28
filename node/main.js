@@ -1,5 +1,4 @@
 const http = require('http');
-const fs = require('fs');
 const url = require('url');
 const qs = require('querystring');
 const template = require('./lib/template')
@@ -7,10 +6,10 @@ const sanitizeHtml = require('sanitize-html')
 const mysql = require('mysql');
 
 const connection = mysql.createConnection({
-  host     : 'localhost',
-  user     : 'root',
-  password : 'password',
-  database : 'database'
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'database'
 });
 connection.connect();
 
@@ -27,23 +26,25 @@ const app = http.createServer((req, res) => {
   }
 
   if (pathname === '/') {
-    connection.query(`SELECT * FROM topic`, (error, topics) => {
+    connection.query(`SELECT *
+                      FROM topic`, (error, topics) => {
       if (error) throw error;
       let temp = '';
       if (isNaN(id)) temp = '<a href="/create">create</a>'
       else {
         title = topics.filter(topic => topic.id === id)
           .map(topic => topic.title);
-        description =  topics.filter(topic => topic.id === id)
+        description = topics.filter(topic => topic.id === id)
           .map(topic => topic.description);
-        temp = `<a href="/update?id=${title}">update</a>
-                    <form action="/delete_process" method="post">
-                      <input type="hidden" name="id" value="${title}">
-                      <input type="submit" value="delete">
-                    </form>`;
+        console.log(id)
+        temp = `<a href="/update?id=${id}">update</a>
+                <form action="/delete_process" method="post">
+                  <input type="hidden" name="id" value="${id}">
+                  <input type="submit" value="delete">
+                </form>`;
       }
 
-      let html = template.html(topics.map(x => x.title)) + temp + `
+      let html = template.html(topics.map(x => x.id), topics.map(x => x.title)) + temp + `
           <div>
             <h3>${title}</h3>
             <p>${description}</p>
@@ -55,9 +56,10 @@ const app = http.createServer((req, res) => {
       res.end(html);
     });
   } else if (pathname === '/create') {
-    connection.query(`SELECT * FROM topic`, (error, topics) => {
+    connection.query(`SELECT *
+                      FROM topic`, (error, topics) => {
       if (error) throw error;
-      let html = template.html(topics.map(topic => topic.title)) + `
+      let html = template.html(topics.map(x => x.id), topics.map(topic => topic.title)) + `
         <form action="/create_process?id=${id}" method="post">
           <p>
         <!--    <label>-->
@@ -86,34 +88,28 @@ const app = http.createServer((req, res) => {
       const post = qs.parse(body);
       const title = sanitizeHtml(post.title);
       const description = sanitizeHtml(post.description);
-      console.log(post.title);
-      console.log(post.description);
-      console.log(Date.now());
-      connection.query(`insert into topic (title, description, created, author_id) 
-                            values (?, ?, NOW(), ?)`, [title, description, 3],
-                      (error, result) => {
-                        if (error) throw error;
-                        console.log(result);
-                        res.writeHead(302, {Location: `/?id=${result.insertId}`});
-                        res.end();
-                      })
-
-      // fs.writeFile(`./data/${title}.txt`, description, 'utf-8', (err) => {
-      //   res.writeHead(302, {Location: `/?id=${title}`});
-      //   res.end();
-      // })
+      connection.query(`insert into topic (title, description, created, author_id)
+                        values (?, ?, NOW(), ?)`, [title, description, 3],
+        (error, result) => {
+          if (error) throw error;
+          console.log(result);
+          res.writeHead(302, {Location: `/?id=${result.insertId}`});
+          res.end();
+        })
     });
   } else if (pathname === '/update') {
-    fs.readdir('./data', (error, fileList) => {
-      fs.readFile(`./data/${query.id}.txt`, 'utf-8', (err, description) => {
-        const title = query.id;
-        console.log(query.id);
-        let html = template.html(fileList) + `
+    connection.query(`SELECT *
+                      FROM topic`, (error, topics) => {
+      const title = topics.filter(topic => topic.id === id)
+        .map(topic => topic.title);
+      const description = topics.filter(topic => topic.id === id)
+        .map(topic => topic.description);
+      let html = template.html(topics.map(x => x.id), topics.map(topic => topic.title)) + `
         <form action="/update_process" method="post">
           <p>
         <!--    <label>-->
         <!--      What-->
-            <input type="text" name="id" value="${title}" readonly hidden>
+            <input type="text" name="id" value="${id}" readonly hidden>
             <input type="text" name="title" placeholder="title" value="${title}">
         <!--    </label>-->
           </p>
@@ -126,10 +122,9 @@ const app = http.createServer((req, res) => {
           </p>
         </form>`;
 
-        res.writeHead(200);
-        res.end(html);
-      });
-    })
+      res.writeHead(200);
+      res.end(html);
+    });
   } else if (pathname === '/update_process') {
     let body = '';
     req.on('data', (data) => {
@@ -138,18 +133,17 @@ const app = http.createServer((req, res) => {
     req.on('end', () => {
       const post = qs.parse(body);
       const id = post.id.toLowerCase();
-      const title = sanitizeHtml(post.title).toLowerCase()
-      const description = sanitizeHtml(post.description).toLowerCase();
-      fs.rename(`./data/${id}.txt`, `./data/${title}.txt`, (err) => {
-        if (err) console.log(err);
-        fs.writeFile(`./data/${title}.txt`, description, 'utf-8', (err) => {
-          if (err) console.log(err);
-          res.writeHead(302, {Location: `/?id=${title}`});
+      const title = sanitizeHtml(post.title)
+      const description = sanitizeHtml(post.description)
+      connection.query(`update topic set title = ?, description = ?
+                        where id = ?`, [title, description, id],
+        (error, result) => {
+          if (error) throw error;
+          console.log(result);
+          res.writeHead(302, {Location: `/?id=${id}`});
           res.end();
-        });
-      })
+        })
     })
-
   } else if (pathname === '/delete_process') {
     let body = '';
     req.on('data', (data) => {
@@ -157,11 +151,13 @@ const app = http.createServer((req, res) => {
     })
     req.on('end', () => {
       const post = qs.parse(body);
-      const id = post.id.toLowerCase();
-      fs.unlink(`./data/${id}.txt`, (err) => {
-        res.writeHead(302, {Location: `/`});
-        res.end();
-      })
+
+      connection.query(`delete from topic where id = ?`, [post.id],
+        (error, result) => {
+          if (error) throw error;
+          res.writeHead(302, {Location: `/`});
+          res.end();
+        });
     })
   } else {
     res.writeHead(200);

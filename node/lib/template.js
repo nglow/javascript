@@ -1,8 +1,8 @@
 module.exports = {
-  html: (fileList) => {
+  html: (idList, titleList) => {
     let list = '<ol>';
-    for (let file of fileList) {
-      list += '<li>' + file + '</li>'
+    for (let i in titleList) {
+      list += `<li><a href="/?id=${idList[i]}">` + titleList[i] + '</a></li>'
     }
     list += '</ol>';
 
@@ -12,7 +12,7 @@ module.exports = {
         <head>
           <meta charset="UTF-8">
           <title>Title</title>
-          <h1>Web</h1>
+          <h1><a href="/">Web</a></h1>
         </head>
         <body>
         ${list}
