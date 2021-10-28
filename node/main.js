@@ -2,26 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const url = require('url');
 const qs = require('querystring');
-
-function getTemplate(fileList) {
-  let list = '<ol>';
-  for (let file of fileList) {
-    list += '<li>' + file + '</li>'
-  }
-  list += '</ol>';
-
-  return `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <title>Title</title>
-          <h1>Web</h1>
-        </head>
-        <body>
-        ${list}
-        `;
-}
+const template = require('./lib/template')
+const sanitizeHtml = require('sanitize-html')
 
 const app = http.createServer((req, res) => {
   let query = url.parse(req.url, true).query;
@@ -41,7 +23,8 @@ const app = http.createServer((req, res) => {
                                                                               <input type="hidden" name="id" value="${title}">
                                                                               <input type="submit" value="delete">
                                                                             </form>`;
-        let template = getTemplate(fileList) + temp + `
+
+        let html = template.html(fileList) + temp + `
           <div>
             <h3>${title}</h3>
             <p>${data}</p>
@@ -50,14 +33,14 @@ const app = http.createServer((req, res) => {
           </html>
         `;
         res.writeHead(200);
-        res.end(template);
+        res.end(html);
       })
     });
   } else if (pathname === '/create') {
     fs.readdir('./data', (error, fileList) => {
       console.log(fileList);
 
-      let template = getTemplate(fileList) + `
+      let html = template.html(fileList) + `
         <form action="/create_process" method="post">
           <p>
         <!--    <label>-->
@@ -75,7 +58,7 @@ const app = http.createServer((req, res) => {
         </form>`;
 
       res.writeHead(200);
-      res.end(template);
+      res.end(html);
     })
   } else if (pathname === '/create_process') {
     let body = '';
@@ -84,8 +67,8 @@ const app = http.createServer((req, res) => {
     });
     req.on('end', () => {
       const post = qs.parse(body);
-      const title = post.title;
-      const description = post.description;
+      const title = sanitizeHtml(post.title);
+      const description = sanitizeHtml(post.description);
       console.log(post.title);
       console.log(post.description);
       fs.writeFile(`./data/${title}.txt`, description, 'utf-8', (err) => {
@@ -98,7 +81,7 @@ const app = http.createServer((req, res) => {
       fs.readFile(`./data/${query.id}.txt`, 'utf-8', (err, description) => {
         const title = query.id;
         console.log(query.id);
-        let template = getTemplate(fileList) + `
+        let html = template.html(fileList) + `
         <form action="/update_process" method="post">
           <p>
         <!--    <label>-->
@@ -117,7 +100,7 @@ const app = http.createServer((req, res) => {
         </form>`;
 
         res.writeHead(200);
-        res.end(template);
+        res.end(html);
       });
     })
   } else if (pathname === '/update_process') {
@@ -128,8 +111,8 @@ const app = http.createServer((req, res) => {
     req.on('end', () => {
       const post = qs.parse(body);
       const id = post.id.toLowerCase();
-      const title = post.title.toLowerCase();
-      const description = post.description;
+      const title = sanitizeHtml(post.title).toLowerCase()
+      const description = sanitizeHtml(post.description).toLowerCase();
       fs.rename(`./data/${id}.txt`, `./data/${title}.txt`, (err) => {
         if (err) console.log(err);
         fs.writeFile(`./data/${title}.txt`, description, 'utf-8', (err) => {
